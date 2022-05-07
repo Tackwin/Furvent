@@ -1,0 +1,6 @@
+.vscode/*
+ease_build/*
+ease_temp/*
+*.exe
+*.pdb
+*.ilk
