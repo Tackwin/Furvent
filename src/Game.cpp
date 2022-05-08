@@ -73,6 +73,7 @@ void Game::step(RNG_State& rng_state) noexcept {
 	case 0: {
 		current_hand = {};
 		current_hand.draw.reset();
+		current_hand.start_seed = rng_state;
 		current_hand.draw.shuffle(rng_state);
 
 		for (auto& x : current_hand.won) x = false;

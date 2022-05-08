@@ -133,6 +133,7 @@ struct Player {
 };
 
 struct Hand {
+	RNG_State start_seed;
 	Deck draw;
 
 	std::array<Card, 3> flop;
@@ -169,7 +170,6 @@ struct Agent {
 
 struct Game {
 	Game() noexcept;
-
 
 	Hand current_hand;
 

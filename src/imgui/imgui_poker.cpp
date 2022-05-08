@@ -8,6 +8,7 @@
 
 #include "Macros.hpp"
 #include "Game.hpp"
+#include "math/random.hpp"
 
 ImVec2 operator/(const ImVec2& left, int right) noexcept {
 	return {left.x / right, left.y / right};
@@ -39,18 +40,6 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 	if (game.is_over()) ImGui::Text("Game over !");
 	X(big_blind);
 	X(current_hand.running_bet);
-	ImGui::Separator();
-	X(players[0].stack);
-	X(players[0].folded);
-	X(players[0].current_bet);
-	ImGui::Separator();
-	X(players[1].stack);
-	X(players[1].folded);
-	X(players[1].current_bet);
-	ImGui::Separator();
-	X(players[2].stack);
-	X(players[2].folded);
-	X(players[2].current_bet);
 
 	ret.step = ImGui::Button("Step");
 	ImGui::SameLine();
@@ -74,9 +63,24 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 		COL(0.1, 0.9, 0.1, 1.0)
 	};
 
+	uint8_t bufferSeed[22];
+	export_seed(game.current_hand.start_seed, bufferSeed);
+
 	draw_list->AddRectFilled(center - size / 3, center + size / 3, COL(0.4, 0.4, 0.4, 1.0));
 	draw_list->AddRect(center - size / 3, center + size / 3, COL(0.1, 0.1, 0.1, 1.0), 0, 15, 2);
-	
+	draw_list->AddText(
+		center + ImVec2{ size.x / 3 + 20, 0 },
+		COL(1, 1, 1, 1),
+		(const char*)bufferSeed,
+		(const char*)(bufferSeed + 11)
+	);
+	draw_list->AddText(
+		center + ImVec2{ size.x / 3 + 20, 15 },
+		COL(1, 1, 1, 1),
+		(const char*)(bufferSeed + 11),
+		(const char*)(bufferSeed + 22)
+	);
+
 	auto draw_card = [&] (const Card* card, ImVec2 p) {
 		if (!card) {
 			draw_list->AddRectFilled(p - CARD_SIZE / 2, p + CARD_SIZE / 2, COL(0.9, 0.6, 0.6, 1.0));
@@ -96,9 +100,11 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 		char bufferName[] = "Player XXXXXXX";
 		char bufferAgent[] = "Agent XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 		char bufferBet[]  = "Bet XXXXXXXX";
+		char bufferStack[]  = "Stack XXXXXXXX";
 		sprintf(bufferName, "Player %d", (int)i);
 		sprintf(bufferAgent, "Agent %s", game.agents[i]->type_name());
 		sprintf(bufferBet, "Bet %d", (int)player.current_bet);
+		sprintf(bufferStack, "Stack %d", (int)player.stack);
 
 		float t = 2 * 3.1415926 * (0.5 + i / 3.0);
 
@@ -113,16 +119,20 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 			);
 		}
 
-		draw_card(game.phase > 0 ? &player.hand[0] : nullptr, p - ImVec2{CARD_SIZE.x / 2 + 5, 0});
-		draw_card(game.phase > 0 ? &player.hand[1] : nullptr, p + ImVec2{CARD_SIZE.x / 2 + 5, 0});
+		bool hide_card = game.phase == 0 || player.folded;
+		draw_card(hide_card ? nullptr : &player.hand[0], p - ImVec2{CARD_SIZE.x / 2 + 5, 0});
+		draw_card(hide_card ? nullptr : &player.hand[1], p + ImVec2{CARD_SIZE.x / 2 + 5, 0});
 		draw_list->AddText(
-			p - ImVec2{CARD_SIZE.x / 3, CARD_SIZE.y / 2 + 25}, COL(1, 1, 1, 1), bufferName
+			p - ImVec2{CARD_SIZE.x, CARD_SIZE.y / 2 + 25}, COL(1, 1, 1, 1), bufferName
 		);
 		draw_list->AddText(
-			p - ImVec2{CARD_SIZE.x / 3, CARD_SIZE.y / 2 + 45}, COL(1, 1, 1, 1), bufferAgent
+			p - ImVec2{CARD_SIZE.x, CARD_SIZE.y / 2 + 45}, COL(1, 1, 1, 1), bufferAgent
 		);
 		draw_list->AddText(
-			p - ImVec2{CARD_SIZE.x / 3, -CARD_SIZE.y / 2 - 5}, COL(1, 1, 1, 1), bufferBet
+			p - ImVec2{CARD_SIZE.x, -CARD_SIZE.y / 2 - 5}, COL(1, 1, 1, 1), bufferBet
+		);
+		draw_list->AddText(
+			p - ImVec2{CARD_SIZE.x, -CARD_SIZE.y / 2 - 20}, COL(1, 1, 1, 1), bufferStack
 		);
 
 		if (i == (game.big_bling_idx % game.players.size())) {
@@ -150,6 +160,7 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 		center + ImVec2{ (CARD_SIZE.x + 10) * 1.5f - 0, -CARD_SIZE.y / 2 - 3},
 		COL(0, 0, 1, 1)
 	);
+
 
 	char buffer[] = "Pot: XXXXXXXXXX";
 	sprintf(buffer, "Pot: %d", (int)game.current_hand.pot);
