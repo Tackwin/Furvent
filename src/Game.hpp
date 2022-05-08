@@ -112,7 +112,7 @@ struct Card {
 };
 
 struct Deck {
-	std::vector<Card> deck;
+	std::array<Card, 52> deck;
 	size_t top = 0;
 
 	Deck() noexcept;
@@ -192,6 +192,8 @@ struct Game {
 	bool is_over() noexcept;
 
 	void render() noexcept;
+
+	size_t best() noexcept;
 };
 
 

@@ -68,7 +68,7 @@ void export_seed(xorshift128_state& state, uint8_t b64[22]) noexcept {
 }
 
 double uniform(xorshift128_state& state) noexcept {
-	return xorshift128(state) / UINT32_MAX;
+	return xorshift128(state) / (double)UINT32_MAX;
 }
 
 double normal(xorshift128_state& state) noexcept {

@@ -36,10 +36,34 @@ Action Bonobo_Agent::act(const Player& me, const Game& game) noexcept {
 	return action;
 }
 
+void Table_Agent::init_random(RNG_State& rng) noexcept {
+	for (auto& x : weight) x = normal(rng);
+}
+
 Action Table_Agent::act(const Player& me, const Game& game) noexcept {
 	Action action;
-	action.kind = Action::None;
-	return action;
+
+	size_t card1_idx = (size_t)me.hand[0].value;
+	size_t card2_idx = (size_t)me.hand[1].value;
+
+	if (card1_idx > card2_idx) {
+		auto t = card2_idx;
+		card2_idx = card1_idx;
+		card1_idx = t;
+	}
+
+	if (me.hand[0].color != me.hand[1].color) {
+		auto t = card2_idx;
+		card2_idx = card1_idx;
+		card1_idx = t;
+	}
+
+	if (weight[card1_idx + card2_idx * (size_t)Value::Size] > 0) {
+		action.kind = Action::Raise;
+		action.value = me.stack;
+	} else {
+		action.kind = Action::Fold;
+	}
 
 	return action;
 }

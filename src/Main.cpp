@@ -20,6 +20,7 @@
 #include "GLFW/glfw3.h"
 
 #include "Game.hpp"
+#include "Tournament.hpp"
 
 static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
@@ -55,6 +56,17 @@ int main(int, char**) {
 
 	ImGui::Interaction_State ui_state;
 	Game game;
+	Tournament tourney;
+
+	std::vector<Table_Agent> population;
+	population.resize(3*3*3*3*3*3*3*3*3*3*3*3*3);
+	for (auto& x : population) x.init_random(rng_state);
+
+	tourney.append(population);
+	tourney.shuffle(rng_state);
+
+	Table_Agent* opened_agent = nullptr;
+	
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
@@ -71,6 +83,14 @@ int main(int, char**) {
 		if (query.hand) game.play_new_hand(rng_state);
 		if (query.toggle_run) ui_state.run ^= true;
 		if (ui_state.run) game.step(rng_state);
+
+		query = ImGui::display(tourney, ui_state);
+		if (query.round) tourney.round(rng_state);
+		if (query.did_clicked_agent) {
+			auto agent = tourney.rounds[query.clicked_round][query.clicked_agent];
+			opened_agent = dynamic_cast<Table_Agent*>(agent);
+		}
+		if (opened_agent) ImGui::display(*opened_agent);
 
 		// Rendering
 		ImGui::Render();

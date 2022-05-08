@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Game.hpp"
+#include "math/random.hpp"
 
 struct Bonobo_Agent : public Agent {
 	size_t weight[1] = { 1 };
@@ -10,7 +11,9 @@ struct Bonobo_Agent : public Agent {
 };
 
 struct Table_Agent : public Agent {
-	size_t weight[52*52] = { 1 };
+	double weight[(size_t)Value::Size * (size_t)Value::Size] = { 1 };
+
+	void init_random(RNG_State& rng) noexcept;
 
 	virtual Action act(const Player& player, const Game& game) noexcept;
 	virtual const char* type_name() const noexcept { return "Table"; }

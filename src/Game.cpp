@@ -89,33 +89,21 @@ void Game::step(RNG_State& rng_state) noexcept {
 		break;
 	}
 	case 1: {
-		if (n_rounds == 148) {
-			int dummmy = 42;
-		}
 		round(true);
 		break;
 	}
 	case 2: {
-		if (n_rounds == 149) {
-			int dummmy = 42;
-		}
 		for (size_t i = 0; i < current_hand.flop.size(); ++i)
 			current_hand.flop[i] = current_hand.draw.draw();
 		round(false);
 		break;
 	}
 	case 3: {
-		if (n_rounds == 150) {
-			int dummmy = 42;
-		}
 		current_hand.turn = current_hand.draw.draw();
 		round(false);
 		break;
 	}
 	case 4: {
-		if (n_rounds == 151) {
-			int dummmy = 42;
-		}
 		current_hand.river = current_hand.draw.draw();
 		round(false);
 		auto places = pick_winners(players, {
@@ -206,9 +194,9 @@ void Game::apply(Player& player, Action action) noexcept {
 	}
 	case Action::Follow: {
 		assert(!player.folded);
-		assert((player.stack + player.current_bet) >= current_hand.running_bet);
-
 		size_t dt = current_hand.running_bet - player.current_bet;
+		assert(player.stack >= dt);
+
 		player.stack       -= dt;
 		current_hand.pot   += dt;
 		player.current_bet += dt;
@@ -218,7 +206,6 @@ void Game::apply(Player& player, Action action) noexcept {
 	case Action::Raise: {
 		assert(!player.folded);
 		assert(player.stack >= action.value);
-		assert(player.current_bet + action.value >= current_hand.running_bet);
 
 		player.stack       -= action.value;
 		current_hand.pot   += action.value;
@@ -293,10 +280,10 @@ void Game::render() noexcept {
 
 
 Deck::Deck() noexcept {
-	deck.reserve((size_t)Color::Size * (size_t)Value::Size);
+	size_t n = 0;
 	for (size_t i = 0; i < (size_t)Color::Size; ++i) {
 		for (size_t j = 0; j < (size_t)Value::Size; ++j) {
-			deck.push_back({ (Color)i, (Value)j });
+			deck[n++] = { (Color)i, (Value)j };
 		}
 	}
 }
@@ -563,3 +550,9 @@ std::array<size_t, 3> pick_winners(
 	return places;
 }
 
+size_t Game::best() noexcept {
+	size_t best = 0;
+	if (players[1].stack > players[best].stack) best = 1;
+	if (players[2].stack > players[best].stack) best = 2;
+	return best;
+}
