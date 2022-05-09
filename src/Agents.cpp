@@ -67,3 +67,19 @@ Action Table_Agent::act(const Player& me, const Game& game) noexcept {
 
 	return action;
 }
+
+void Table_Agent::offspring(Agent& agent_out, RNG_State& rng) noexcept {
+	Table_Agent* out = dynamic_cast<Table_Agent*>(&agent_out);
+	if (!out) return;
+
+	memcpy(out->weight, weight, (size_t)Value::Size * (size_t)Value::Size * sizeof(double));
+	for (auto& x : out->weight) x += uniform(rng);
+
+	double avg = 0;
+	for (auto& x : out->weight) avg += x;
+	avg /= (size_t)Value::Size * (size_t)Value::Size;
+
+	for (auto& x : out->weight) x -= avg;
+	for (auto& x : out->weight) x *= 0.9;
+
+}

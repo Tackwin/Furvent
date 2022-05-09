@@ -26,6 +26,42 @@ static void glfw_error_callback(int error, const char* description) {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+void repopulate(
+	std::vector<Table_Agent>& population,
+	const std::vector<Agent*>& elites,
+	RNG_State& rng
+) noexcept {
+	thread_local std::vector<Table_Agent> new_population;
+	new_population.clear();
+	new_population.reserve(population.size());
+
+	if (elites.empty()) return;
+
+	size_t rest = population.size();
+	size_t div = population.size() / elites.size();
+
+	for (size_t i = 0; i < elites.size(); ++i) {
+		auto& elite = *dynamic_cast<Table_Agent*>(elites[i]);
+		new_population.push_back(elite);
+		
+		for (size_t j = 1; j < div; ++j) {
+			Table_Agent new_agent;
+			elite.offspring(new_agent, rng);
+			new_population.push_back(new_agent);
+		}
+
+		rest -= div;
+	}
+
+	for (; rest > 0; rest--) {
+		Table_Agent new_agent;
+		elites.front()->offspring(new_agent, rng);
+		new_population.push_back(new_agent);
+	}
+
+	population.swap(new_population);
+}
+
 int main(int, char**) {
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);
@@ -58,15 +94,17 @@ int main(int, char**) {
 	Game game;
 	Tournament tourney;
 
+	constexpr size_t Population_N = 3*3*3*3*3*3*3*3;
 	std::vector<Table_Agent> population;
-	population.resize(3*3*3*3*3*3*3*3*3*3*3*3*3);
+	population.resize(Population_N);
 	for (auto& x : population) x.init_random(rng_state);
 
 	tourney.append(population);
 	tourney.shuffle(rng_state);
 
 	Table_Agent* opened_agent = nullptr;
-	
+
+	bool autorun_gen = false;
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
@@ -78,19 +116,36 @@ int main(int, char**) {
 		ImGui::NewFrame();
 
 		if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
+
+		// GAME
 		auto query = ImGui::display(game, ui_state);
 		if (query.step) game.step(rng_state);
 		if (query.hand) game.play_new_hand(rng_state);
 		if (query.toggle_run) ui_state.run ^= true;
 		if (ui_state.run) game.step(rng_state);
 
+		// TOURNEY
 		query = ImGui::display(tourney, ui_state);
+		ui_state.n_best = query.n_best;
 		if (query.round) tourney.round(rng_state);
 		if (query.did_clicked_agent) {
 			auto agent = tourney.rounds[query.clicked_round][query.clicked_agent];
 			opened_agent = dynamic_cast<Table_Agent*>(agent);
 		}
 		if (opened_agent) ImGui::display(*opened_agent);
+		if (query.run_season) {
+			tourney.at_least_n_best(ui_state.n_best, rng_state);
+		}
+		if (query.toggle_next_gen) autorun_gen ^= true;
+		if (autorun_gen) {
+			tourney.at_least_n_best(ui_state.n_best, rng_state);
+		}
+		if (query.next_gen || autorun_gen) {
+			repopulate(population, tourney.rounds.back(), rng_state);
+			tourney = {};
+			tourney.append(population);
+			tourney.shuffle(rng_state);
+		}
 
 		// Rendering
 		ImGui::Render();

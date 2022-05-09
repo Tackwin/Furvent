@@ -289,8 +289,14 @@ Deck::Deck() noexcept {
 }
 
 void Deck::shuffle(RNG_State& state) noexcept {
-	std::shuffle(BEG_END(deck), Uniform_uint32_t{state});
+	for (size_t i = 52; i > 1; i--) {
+		auto p = (int64_t)(uniform(state) * 51.999999);
+		auto t = deck[i - 1];
+		deck[i - 1] = deck[p];
+		deck[p] = t;
+	}
 }
+
 void Deck::reset() noexcept {
 	top = 0;
 }
@@ -298,7 +304,42 @@ Card Deck::draw() noexcept {
 	return deck[top++];
 }
 
+#include "evaluator/evaluator.hpp"
+
 std::array<size_t, 3> pick_winners(
+	const std::array<Player, 3>& players, std::array<Card, 5> board
+) noexcept {
+	auto cast = [] (const Card& card) {
+		return (size_t)card.value * (size_t)Color::Size + (size_t)card.color;
+	};
+
+	std::array<size_t, 3> scores;
+	for (size_t i = 0; i < players.size(); ++i)
+		scores[i] = evaluate_7cards(
+			cast(players[i].hand[0]),
+			cast(players[i].hand[1]),
+			cast(board[0]),
+			cast(board[1]),
+			cast(board[2]),
+			cast(board[3]),
+			cast(board[4])
+		);
+
+	std::array<size_t, 3> result;
+	for (size_t i = 0; i < players.size(); ++i) result[i] = i;
+	std::sort(BEG_END(result), [&] (size_t a, size_t b) { return scores[a] < scores[b]; });
+	
+	std::array<size_t, 3> places;
+	size_t place = 0;
+	places[result[0]] = place;
+	for (size_t i = 1; i < players.size(); ++i) {
+		if (!(scores[i] == scores[i - 1])) place++;
+		places[result[i]] = place;
+	}
+
+	return places;
+}
+std::array<size_t, 3> pick_winners_(
 	const std::array<Player, 3>& players, std::array<Card, 5> board
 ) noexcept {
 	struct Combo {

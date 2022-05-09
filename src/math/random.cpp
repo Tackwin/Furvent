@@ -68,7 +68,8 @@ void export_seed(xorshift128_state& state, uint8_t b64[22]) noexcept {
 }
 
 double uniform(xorshift128_state& state) noexcept {
-	return xorshift128(state) / (double)UINT32_MAX;
+	constexpr double mul = 1.0 / (double)UINT32_MAX;
+	return xorshift128(state) * mul;
 }
 
 double normal(xorshift128_state& state) noexcept {
@@ -78,8 +79,8 @@ double normal(xorshift128_state& state) noexcept {
 	do {
 		x = uniform(state) * 2 - 1;
 		y = uniform(state) * 2 - 1;
-		s = x + y;
-	} while(s < 0 || s > 1);
+		s = x*x + y*y;
+	} while(s <= 0 || s >= 1);
 
-	return x / sqrt(-2 * log(s) / s);
+	return x * sqrt(-2 * log(s) / s);
 }

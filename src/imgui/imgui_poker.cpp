@@ -211,6 +211,14 @@ ImGui::Interaction_Query ImGui::display(
 	defer { ImGui::End(); };
 
 	ret.round = ImGui::Button("Round");
+	int x = state.n_best;
+	ImGui::ItemSize({100, 0});
+	ImGui::SliderInt("Top N", &x, 0, 10000);
+	ret.n_best = x;
+	ImGui::SameLine();
+	ret.run_season = ImGui::Button("Season");
+	ret.next_gen = ImGui::Button("Next gen");
+	ret.toggle_next_gen = ImGui::Button("Run gen");
 
 	auto window = ImGui::GetCurrentWindow();
 	auto draw_list = ImGui::GetWindowDrawList();
@@ -607,7 +615,23 @@ void ImGui::display(Table_Agent& agent) noexcept {
 			);
 			auto& color = Viridis_Color_Map[color_idx];
 
+
+			bool hovered = false;
+			ImGui::ButtonBehavior(
+				{ p, p + CELL_SIZE},
+				window->GetID((const void*)(i * (size_t)Value::Size + j)),
+				&hovered,
+				nullptr,
+				ImGuiButtonFlags_MouseButtonLeft
+			);
 			draw_list->AddRectFilled(p, p + CELL_SIZE, COL(color.x, color.y, color.z, 1));
+			
+			if (hovered) {
+				ImGui::BeginTooltip();
+				defer { ImGui::EndTooltip(); };
+
+				ImGui::Text("%f", agent.weight[j + i * (size_t)Value::Size]);
+			}
 		}
 	}
 }

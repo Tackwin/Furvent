@@ -17,4 +17,5 @@ struct Tournament {
 	void shuffle(RNG_State& state) noexcept;
 
 	void round(RNG_State& state) noexcept;
+	void at_least_n_best(size_t n, RNG_State& state) noexcept;
 };

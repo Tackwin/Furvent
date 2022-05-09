@@ -15,6 +15,7 @@ struct Table_Agent : public Agent {
 
 	void init_random(RNG_State& rng) noexcept;
 
+	virtual void offspring(Agent& out, RNG_State& rng) noexcept;
 	virtual Action act(const Player& player, const Game& game) noexcept;
 	virtual const char* type_name() const noexcept { return "Table"; }
 };
