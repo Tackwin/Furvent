@@ -3,6 +3,16 @@
 #include <math.h>
 
 
+xorshift128_state derive(xorshift128_state& state) noexcept {
+	xorshift128_state n;
+	n.x[0] = xorshift128(state);
+	n.x[1] = xorshift128(state);
+	n.x[2] = xorshift128(state);
+	n.x[3] = xorshift128(state);
+	return n;
+}
+
+
 uint32_t xorshift128(xorshift128_state& state) noexcept {
 	/* Algorithm "xor128" from p. 5 of Marsaglia, "Xorshift RNGs" */
 	uint32_t t  = state.x[3];

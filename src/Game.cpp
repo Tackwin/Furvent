@@ -1,3 +1,4 @@
+
 #include "Game.hpp"
 #include <algorithm>
 #include <assert.h>
@@ -23,52 +24,67 @@ Game::Game() noexcept {
 
 bool Game::is_over() noexcept {
 	size_t n = 0;
-	for (auto& x : players) if (x.stack > 0) n++;
-	return n == 1;
+	for (auto& x : players) if (!x.out) n += 1;
+	return n <= 1;
+}
+
+void Game::move_big_blind() noexcept {
+	big_bling_idx++;
+
+	for (size_t i = 0; i < players.size(); ++i, ++big_bling_idx)
+		if (!players[big_bling_idx % players.size()].out) break;
+
+	big_bling_idx %= players.size();
+}
+
+size_t Game::small_bling_player_idx() noexcept {
+	for (size_t i = 0; i < players.size(); ++i) {
+		auto& p = players[(big_bling_idx + 1 + i) % players.size()];
+		if (!p.out) return (big_bling_idx + 1 + i) % players.size();
+	}
+	return big_bling_idx;
+}
+
+void Game::round(bool force_blind, RNG_State& rng) noexcept {
+	n_rounds++;
+
+	current_hand.running_bet = 0;
+	for (auto& x : players) x.current_bet = 0;
+
+	if (force_blind) {
+		auto& big_player = players[big_bling_idx];
+		auto& small_player = players[small_bling_player_idx()];
+
+		current_hand.pot         += std::min(big_player.stack,   big_blind / 1);
+		big_player.bet           += std::min(big_player.stack,   big_blind / 1);
+		big_player.current_bet   += std::min(big_player.stack,   big_blind / 1);
+		big_player.stack         -= std::min(big_player.stack,   big_blind / 1);
+
+		current_hand.pot         += std::min(small_player.stack, big_blind / 2);
+		small_player.bet         += std::min(small_player.stack, big_blind / 2);
+		small_player.current_bet += std::min(small_player.stack, big_blind / 2);
+		small_player.stack       -= std::min(small_player.stack, big_blind / 2);
+		
+		current_hand.running_bet = big_blind;
+	}
+
+	size_t before_running_bet = 0;
+	raised_turn = false;
+	do {
+		before_running_bet = current_hand.running_bet;
+
+		for (size_t i = 0; i < players.size(); ++i) {
+			auto idx = (i + big_bling_idx + 1) % players.size();
+			if (players[idx].folded || players[idx].stack == 0) continue;
+
+			auto act = agents[idx]->act(players[idx], *this, rng);
+			apply(players[idx], act);
+		}
+	} while (current_hand.running_bet > before_running_bet);
 }
 
 void Game::step(RNG_State& rng_state) noexcept {
-	auto round = [&] (bool force_blind) {
-		n_rounds++;
-
-		current_hand.running_bet = 0;
-		for (auto& x : players) x.current_bet = 0;
-
-		if (force_blind) {
-			auto& big_player = players[big_bling_idx];
-			auto& small_player = players[((players.size() + big_bling_idx) - 1) % players.size()];
-
-			current_hand.pot         += std::min(big_player.stack,   big_blind);
-			big_player.bet           += std::min(big_player.stack,   big_blind);
-			big_player.current_bet   += std::min(big_player.stack,   big_blind);
-			big_player.stack         -= std::min(big_player.stack,   big_blind);
-
-			current_hand.pot         += std::min(small_player.stack, big_blind / 2);
-			small_player.bet         += std::min(small_player.stack, big_blind / 2);
-			small_player.current_bet += std::min(small_player.stack, big_blind / 2);
-			small_player.stack       -= std::min(small_player.stack, big_blind / 2);
-			
-			current_hand.running_bet = big_blind;
-		}
-
-		size_t before_running_bet = 0;
-		raised_turn = false;
-		bool first_turn = true;
-		do {
-			before_running_bet = current_hand.running_bet;
-
-			for (size_t i = 0; i < players.size(); ++i) {
-				auto idx = (i + big_bling_idx + 1) % players.size();
-				if (players[idx].folded) continue;
-
-				auto act = agents[idx]->act(players[idx], *this);
-				apply(players[idx], act);
-			}
-
-			first_turn = false;
-		} while (current_hand.running_bet > before_running_bet);
-	};
-
+	if (is_over()) return;
  	switch (phase) {
 	case 0: {
 		current_hand = {};
@@ -89,23 +105,23 @@ void Game::step(RNG_State& rng_state) noexcept {
 		break;
 	}
 	case 1: {
-		round(true);
+		round(true, rng_state);
 		break;
 	}
 	case 2: {
 		for (size_t i = 0; i < current_hand.flop.size(); ++i)
 			current_hand.flop[i] = current_hand.draw.draw();
-		round(false);
+		round(false, rng_state);
 		break;
 	}
 	case 3: {
 		current_hand.turn = current_hand.draw.draw();
-		round(false);
+		round(false, rng_state);
 		break;
 	}
 	case 4: {
 		current_hand.river = current_hand.draw.draw();
-		round(false);
+		round(false, rng_state);
 		auto places = pick_winners(players, {
 			current_hand.flop[0],
 			current_hand.flop[1],
@@ -163,6 +179,9 @@ void Game::step(RNG_State& rng_state) noexcept {
 			// This pot has been handled onto the next one !
 			current_hand.pot -= sum;
 		}
+
+		// If any player doesn't have any stack at this point he is out.
+		for (auto& x : players) if (x.stack == 0) x.out = true;
 
 		big_bling_idx++;
 		break;
@@ -224,7 +243,7 @@ void Game::apply(Player& player, Action action) noexcept {
 	}
 }
 
-Action Agent::act(const Player& me, const Game& game) noexcept {
+Action Agent::act(const Player& me, const Game& game, RNG_State&) noexcept {
 	Action action;
 	if (me.stack == 0) {
 		action.kind = Action::None;

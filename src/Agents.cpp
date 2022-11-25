@@ -1,6 +1,6 @@
 #include "Agents.hpp"
 
-Action Bonobo_Agent::act(const Player& me, const Game& game) noexcept {
+Action Bonobo_Agent::act(const Player& me, const Game& game, RNG_State& rng) noexcept {
 	Action action;
 	if (me.stack == 0) {
 		action.kind = Action::None;
@@ -40,7 +40,7 @@ void Table_Agent::init_random(RNG_State& rng) noexcept {
 	for (auto& x : weight) x = normal(rng);
 }
 
-Action Table_Agent::act(const Player& me, const Game& game) noexcept {
+Action Table_Agent::act(const Player& me, const Game& game, RNG_State& rng) noexcept {
 	Action action;
 
 	size_t card1_idx = (size_t)me.hand[0].value;
@@ -72,14 +72,24 @@ void Table_Agent::offspring(Agent& agent_out, RNG_State& rng) noexcept {
 	Table_Agent* out = dynamic_cast<Table_Agent*>(&agent_out);
 	if (!out) return;
 
-	memcpy(out->weight, weight, (size_t)Value::Size * (size_t)Value::Size * sizeof(double));
-	for (auto& x : out->weight) x += uniform(rng);
+	out->weight = weight;
+	// out->mutate = mutate;
+	// float d = normal(rng);
+	// for (size_t i = 0; i < 13; ++i) out->weight[i * 13 + i] += d;
 
-	double avg = 0;
-	for (auto& x : out->weight) avg += x;
-	avg /= (size_t)Value::Size * (size_t)Value::Size;
+	// for (auto& x : out->mutate) x += normal(rng);
+	// for (auto& x : out->mutate) x *= 0.99f;
 
-	for (auto& x : out->weight) x -= avg;
-	for (auto& x : out->weight) x *= 0.9;
+	for (size_t i = 0; i < out->weight.size(); ++i)
+		if (uniform(rng) > 0.50) out->weight[i] += normal(rng) * 0.05;
+		// else                     out->weight[i] *= 0.999;
+	// for (size_t i = 0; i < out->weight.size(); ++i)
+	// 	if (uniform(rng) > 0.99) out->weight[i] *= -1;
+
+	// double avg = 0;
+	// for (auto& x : out->weight) avg += x;
+	// avg /= (size_t)Value::Size * (size_t)Value::Size;
+
+	// // for (auto& x : out->weight) x -= avg;
 
 }

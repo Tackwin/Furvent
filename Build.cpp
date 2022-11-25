@@ -12,7 +12,7 @@ Build build(Flags flags) noexcept {
 	b.add_header("src/");
 	b.add_source_recursively("src/");
 
-	b.add_define("IMGUI_DISABLE_INCLUDE_IMCONFIG_H");
+	// b.add_define("IMGUI_DISABLE_INCLUDE_IMCONFIG_H");
 
 	b.add_library("opengl32");
 	b.add_library("gdi32");

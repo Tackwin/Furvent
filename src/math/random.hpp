@@ -18,6 +18,8 @@ struct xorshift128_state {
 /* The state array must be initialized to not be all zero */
 extern uint32_t xorshift128(xorshift128_state& state) noexcept;
 
+extern xorshift128_state derive(xorshift128_state& state) noexcept;
+
 extern void import_seed(xorshift128_state& state, uint8_t b64[22]) noexcept;
 extern void export_seed(xorshift128_state& state, uint8_t b64[22]) noexcept;
 

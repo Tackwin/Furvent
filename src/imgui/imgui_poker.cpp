@@ -38,7 +38,6 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 	defer { ImGui::End(); };
 
 	#define X(n) ImGui::Text(#n ": %d", (int)game.n);
-	if (game.is_over()) ImGui::Text("Game over !");
 	X(big_blind);
 	X(current_hand.running_bet);
 
@@ -48,6 +47,7 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 	ImGui::SameLine();
 	if (state.run) ret.toggle_run = ImGui::Button("Stop");
 	else           ret.toggle_run = ImGui::Button("Play");
+	ret.replay = ImGui::Button("New gamey");
 
 	auto draw_list = ImGui::GetWindowDrawList();
 	auto offset = ImGui::GetWindowPos();
@@ -139,7 +139,7 @@ ImGui::Interaction_Query ImGui::display(Game& game, const ImGui::Interaction_Sta
 		if (i == (game.big_bling_idx % game.players.size())) {
 			draw_list->AddCircleFilled(p + ImVec2{CARD_SIZE.x + 20, 0}, 5, COL(0, 0, 1, 1));
 		}
-		if (i == ((game.big_bling_idx + 1) % game.players.size())) {
+		if (i == game.small_bling_player_idx()) {
 			draw_list->AddCircleFilled(p + ImVec2{CARD_SIZE.x + 20, 0}, 3, COL(0, 1, 0, 1));
 		}
 	}
@@ -594,8 +594,8 @@ void ImGui::display(Table_Agent& agent) noexcept {
 	auto CELL_SIZE = ImVec2{ 9, 9 };
 	auto CELL_PADDING = 3;
 
-	double min = +DBL_MAX;
-	double max = -DBL_MAX;
+	float min = +FLT_MAX;
+	float max = -FLT_MAX;
 	for (auto& x : agent.weight) {
 		min = std::min(min, x);
 		max = std::max(max, x);
@@ -610,18 +610,22 @@ void ImGui::display(Table_Agent& agent) noexcept {
 			p.x += (CELL_SIZE.x + CELL_PADDING) * j;
 			p.y += (CELL_SIZE.y + CELL_PADDING) * i;
 
-			size_t color_idx = (size_t)std::round(
-				255 * (agent.weight[j + i * (size_t)Value::Size] - min) / (max - min)
-			);
-			auto& color = Viridis_Color_Map[color_idx];
-
+			auto& w = agent.weight[j + i * (size_t)Value::Size];
+			size_t color_idx = (size_t)std::round(255 * (w - min) / (max - min));
+			auto color = Viridis_Color_Map[color_idx];
+			if (w < 0) {
+				color.x = 1 - color.x;
+				color.y = 1 - color.y;
+				color.z = 1 - color.z;
+			}
 
 			bool hovered = false;
+			bool held_plus = false;
 			ImGui::ButtonBehavior(
 				{ p, p + CELL_SIZE},
-				window->GetID((const void*)(i * (size_t)Value::Size + j)),
+				window->GetID((const void*)(2 * (i * (size_t)Value::Size + j) + 0)),
 				&hovered,
-				nullptr,
+				&held_plus,
 				ImGuiButtonFlags_MouseButtonLeft
 			);
 			draw_list->AddRectFilled(p, p + CELL_SIZE, COL(color.x, color.y, color.z, 1));
@@ -630,8 +634,75 @@ void ImGui::display(Table_Agent& agent) noexcept {
 				ImGui::BeginTooltip();
 				defer { ImGui::EndTooltip(); };
 
-				ImGui::Text("%f", agent.weight[j + i * (size_t)Value::Size]);
+				ImGui::Text("%f", w);
 			}
+			if (held_plus && ImGui::IsKeyDown(GetKeyIndex(ImGuiKey_Space))) w -= 0.001f;
+			else if (held_plus)  w += 0.001f;
 		}
 	}
+}
+
+ImGui::Interaction_Query ImGui::display(
+	Round_Robin& round_robin, const ImGui::Interaction_State& ui_state
+) noexcept {
+	ImGui::Interaction_Query ret;
+
+	
+	ImGui::PushID(&round_robin);
+	defer { ImGui::PopID(); };
+
+	ImGui::Begin("Round robin");
+	defer { ImGui::End(); };
+
+	ret.run_season = ImGui::Button("One round");
+	ret.next_gen = ImGui::Button("Next gen");
+	ret.toggle_next_gen = ImGui::Button("Toggle Evolution");
+	int x = ui_state.n_best;
+	ImGui::ItemSize({100, 0});
+	ImGui::SliderInt("Top N", &x, 0, 10000);
+	ret.n_best = x;
+	x = ui_state.n_pop;
+	ImGui::ItemSize({100, 0});
+	ImGui::SliderInt("Pop #", &x, 0, 10000);
+	ret.n_pop = x;
+
+	auto window = ImGui::GetCurrentWindow();
+	auto draw_list = ImGui::GetWindowDrawList();
+	auto offset = ImGui::GetWindowPos();
+	auto pos = ImGui::GetCursorPos();
+	auto size = ImGui::GetContentRegionAvail();
+
+	ImVec2 PLAYER_SIZE = { 5, 5 };
+
+	size_t root = (size_t)std::ceil(std::sqrt(round_robin.agents.size()));
+
+	for (size_t i = 0; i < root; ++i) {
+		for (size_t j = 0; j < root; ++j) {
+			if (i * root + j >= round_robin.agents.size()) continue;
+
+			ImVec2 p = pos + offset + PLAYER_SIZE * 2;
+			p.x += (PLAYER_SIZE.x + 2) * i;
+			p.y += (PLAYER_SIZE.y + 2) * j;
+
+			bool hovered = false;
+			bool clicked = false;
+			clicked |= ImGui::ButtonBehavior(
+				{ p - PLAYER_SIZE / 2, p + PLAYER_SIZE / 2 },
+				window->GetID((const void*)(i * root + j)),
+				&hovered,
+				nullptr,
+				ImGuiButtonFlags_MouseButtonLeft
+			);
+			if (clicked) {
+				ret.did_clicked_agent = true;
+				ret.clicked_agent = i * root + j;
+			}
+			draw_list->AddRectFilled(
+				p - PLAYER_SIZE / 2, p + PLAYER_SIZE / 2,
+				hovered ? COL(0.8, 0.8, 0.8, 1) : COL(0.8, 0.8, 0.0, 1)
+			);
+		}
+	}
+
+	return ret;
 }

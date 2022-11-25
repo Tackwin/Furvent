@@ -90,11 +90,22 @@ int main(int, char**) {
 	RNG_State rng_state;
 	for (size_t i = 0; i < 4; ++i) rng_state.x[i] = i;
 
+	std::array<Table_Agent, 3> table_agents_sample;
+	for (auto& x : table_agents_sample) x.init_random(rng_state);
+	for (auto& w : table_agents_sample[0].weight) w = -100;
+	for (size_t i = 0; i < 13; ++i)
+		for (size_t j = 0;j < 13; ++j)
+			if (i == j || i > 10 || j > 10)
+				table_agents_sample[0].weight[j * 13 + i] = 100;
+
 	ImGui::Interaction_State ui_state;
 	Game game;
+	for (size_t i = 0; i < 3; ++i) game.agents[i] = &table_agents_sample[i];
+	
 	Tournament tourney;
+	Round_Robin round_robin;
 
-	constexpr size_t Population_N = 3*3*3*3*3*3*3*3;
+	constexpr size_t Population_N = 3*3*3*3*3*3*3;
 	std::vector<Table_Agent> population;
 	population.resize(Population_N);
 	for (auto& x : population) x.init_random(rng_state);
@@ -102,9 +113,14 @@ int main(int, char**) {
 	tourney.append(population);
 	tourney.shuffle(rng_state);
 
+	round_robin.append(population);
+
 	Table_Agent* opened_agent = nullptr;
 
-	bool autorun_gen = false;
+	bool autorun_gen_tourney = false;
+	bool autorun_gen_round_robin = false;
+
+	ui_state.n_pop = Population_N;
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
@@ -123,6 +139,10 @@ int main(int, char**) {
 		if (query.hand) game.play_new_hand(rng_state);
 		if (query.toggle_run) ui_state.run ^= true;
 		if (ui_state.run) game.step(rng_state);
+		if (query.replay) {
+			game = {};
+			for (size_t i = 0; i < 3; ++i) game.agents[i] = &table_agents_sample[i];
+		}
 
 		// TOURNEY
 		query = ImGui::display(tourney, ui_state);
@@ -136,16 +156,36 @@ int main(int, char**) {
 		if (query.run_season) {
 			tourney.at_least_n_best(ui_state.n_best, rng_state);
 		}
-		if (query.toggle_next_gen) autorun_gen ^= true;
-		if (autorun_gen) {
+		if (query.toggle_next_gen) autorun_gen_tourney ^= true;
+		if (autorun_gen_tourney) {
 			tourney.at_least_n_best(ui_state.n_best, rng_state);
 		}
-		if (query.next_gen || autorun_gen) {
+		if (query.next_gen || autorun_gen_tourney) {
 			repopulate(population, tourney.rounds.back(), rng_state);
 			tourney = {};
 			tourney.append(population);
 			tourney.shuffle(rng_state);
 		}
+
+		// ROUND ROBIN
+		query = ImGui::display(round_robin, ui_state);
+		ui_state.n_pop = query.n_pop;
+		ui_state.n_best = query.n_best;
+		if (query.did_clicked_agent) {
+			auto agent = round_robin.agents[query.clicked_agent];
+			opened_agent = dynamic_cast<Table_Agent*>(agent);
+		}
+		if (query.toggle_next_gen) autorun_gen_round_robin ^= true;
+		if (query.run_season || autorun_gen_round_robin) {
+			round_robin.play_n(ui_state.n_pop, 6, rng_state);
+		}
+		if (query.next_gen || autorun_gen_round_robin) {
+			round_robin.agents.resize(ui_state.n_best);
+			repopulate(population, round_robin.agents, rng_state);
+			round_robin = {};
+			round_robin.append(population);
+		}
+
 
 		// Rendering
 		ImGui::Render();

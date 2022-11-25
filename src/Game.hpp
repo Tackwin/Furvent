@@ -130,6 +130,8 @@ struct Player {
 	size_t bet{ 0 };
 	size_t current_bet{ 0 };
 	bool folded{ false };
+
+	bool out{ false };
 };
 
 struct Hand {
@@ -165,7 +167,7 @@ struct Agent {
 	
 
 	virtual void offspring(Agent& out, RNG_State& rng) noexcept {}
-	virtual Action act(const Player& player, const Game& game) noexcept;
+	virtual Action act(const Player& player, const Game& game, RNG_State& rng) noexcept;
 	virtual const char* type_name() const noexcept { return "Default"; }
 };
 
@@ -195,7 +197,12 @@ struct Game {
 
 	void render() noexcept;
 
+	void round(bool force_blind, RNG_State& rng) noexcept;
+
 	size_t best() noexcept;
+
+	size_t small_bling_player_idx() noexcept;
+	void move_big_blind() noexcept;
 };
 
 
